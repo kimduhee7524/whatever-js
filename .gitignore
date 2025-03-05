@@ -1,0 +1,14 @@
+# Node.js 관련
+node_modules/
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# 환경 설정 파일
+.eslintrc.json
+.prettierrc
+
+# IDE 관련 설정 (VSCode, JetBrains 등)
+.vscode/
+.idea/
+*.iml
