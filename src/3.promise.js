@@ -1,46 +1,112 @@
-class Promise {
+class MyPromise {
     static STATE = {
         PENDING: "pending",
         FULFILLED: "fulfilled",
         REJECTED: "rejected",
     };
-    callbacks = [];
-    onRejected = null;
 
     constructor(executor) {
-        this.state = Promise.STATE.PENDING;
+        this.state = MyPromise.STATE.PENDING;
+        this.value = null;
+        this.error = null;
+        this.fulfilledCallbacks = [];
+        this.rejectedCallbacks = [];
 
-        const resolve = () => {
-            this.state = Promise.STATE.FULFILLED;
-            this.callbacks.forEach((callback) => callback());
+        const resolve = (value) => {
+            if (this.state === MyPromise.STATE.PENDING){
+                this.state = MyPromise.STATE.FULFILLED;
+                this.value = value;
+                this.fulfilledCallbacks.forEach(callback => callback(this.value));
+            }
         };
-        const reject = () => {
-            this.state = Promise.STATE.rejected;
-            this.onRejected();
+        const reject = (error) => {
+            if (this.state === MyPromise.STATE.PENDING){
+                this.state = MyPromise.STATE.REJECTED;
+                this.error = error;
+                this.rejectedCallbacks.forEach(callback => callback(this.error));
+            }
         };
 
-        executor(resolve, reject);
+        try {
+            executor(resolve, reject);
+        } catch (error) {
+            reject(error);
+        }
     }
 
     then(callback) {
-        if (this.state === Promise.STATE.FULFILLED)
-            callback();
-        else {
-            this.callbacks.push(callback);
-        }
+        return new MyPromise((resolve, reject) => {
+            const handleCallback = (value) => {
+                setTimeout(() => {
+                    try {
+                        const result = callback(value);
+                        if (result instanceof MyPromise) {
+                            result.then(resolve, reject);
+                        } else {
+                            resolve(result);
+                        }
+                    } catch (error) {
+                        reject(error);
+                    }
+                }, 0);
+            };
+    
+            if (this.state === MyPromise.STATE.FULFILLED) {
+                handleCallback(this.value);
+            }
+            else {
+                this.fulfilledCallbacks.push(handleCallback);
+            }
+        });
     }
     catch(onRejected) {
-        if (this.state === MyPromise.STATE.REJECTED) {
-            onRejected();
-        } else {
-            this.onRejected = onRejected;
-        }
+        return new MyPromise((resolve, reject) => {
+            const handleCallback = (value) => {
+                setTimeout(() => {
+                    try {
+                        const result = onRejected(value);
+                        if (result instanceof MyPromise) {
+                            result.then(resolve, reject);
+                        } else {
+                            resolve(result);
+                        }
+                    } catch (error) {
+                        reject(error);
+                    }
+                }, 0);
+            };
+    
+            if (this.state === MyPromise.STATE.REJECTED) {
+                handleCallback(this.error);
+            }
+            else {
+                this.rejectedCallbacks.push(handleCallback);
+            }
+        });
     }
     finally(callback) {
-        if (this.state === MyPromise.STATE.PENDING) {
-            callback();
-        } else {
-            this.callbacks.push(callback);
-        }
+        return new MyPromise((resolve, reject) => {
+            const handleCallback = () => {
+                setTimeout(() => {
+                    try {
+                        callback();
+                        if (this.state === MyPromise.STATE.FULFILLED) {
+                            resolve(this.value);
+                        } else {
+                            reject(this.error);
+                        }
+                    } catch (error) {
+                        reject(error);
+                    }
+                }, 0);
+            };
+    
+            if (this.state !== MyPromise.STATE.PENDING) {
+                handleCallback();
+            } else {
+                this.fulfilledCallbacks.push(handleCallback);
+                this.rejectedCallbacks.push(handleCallback); 
+            }
+        });
     }
 }
