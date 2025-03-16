@@ -1,4 +1,4 @@
-class MyPromise {
+export default class MyPromise {
     static STATE = {
         PENDING: "pending",
         FULFILLED: "fulfilled",
@@ -6,25 +6,32 @@ class MyPromise {
     };
 
     constructor(executor) {
-        this.state = MyPromise.STATE.PENDING;
-        this.value = null;
-        this.error = null;
-        this.fulfilledCallbacks = [];
-        this.rejectedCallbacks = [];
+        this.state = MyPromise.STATE.PENDING;  // Promise 상태
+        this.result = undefined;               // Promise 결과값
+        this.fulfillReactions = [];          // 성공 시 실행할 핸들러 배열
+        this.rejectReactions = [];           // 실패 시 실행할 핸들러 배열
+        this.isHandled = false;                // Promise가 처리되었는지 여부
 
         const resolve = (value) => {
-            if (this.state === MyPromise.STATE.PENDING){
-                this.state = MyPromise.STATE.FULFILLED;
-                this.value = value;
-                this.fulfilledCallbacks.forEach(callback => callback(this.value));
-            }
+            if (this.state !== MyPromise.STATE.PENDING) return;
+
+            this.state = MyPromise.STATE.FULFILLED;
+            this.result = value;
+            this.fulfillReactions.forEach(handler => {
+                queueMicrotask(() => handler(this.result));
+            });
+            this.fulfillReactions = [];
         };
+
         const reject = (error) => {
-            if (this.state === MyPromise.STATE.PENDING){
-                this.state = MyPromise.STATE.REJECTED;
-                this.error = error;
-                this.rejectedCallbacks.forEach(callback => callback(this.error));
-            }
+            if (this.state !== MyPromise.STATE.PENDING) return;
+
+            this.state = MyPromise.STATE.REJECTED;
+            this.result = error;
+            this.rejectReactions.forEach(handler => {
+                queueMicrotask(() => handler(this.result));
+            });
+            this.rejectReactions = [];
         };
 
         try {
@@ -37,7 +44,7 @@ class MyPromise {
     then(callback) {
         return new MyPromise((resolve, reject) => {
             const handleCallback = (value) => {
-                setTimeout(() => {
+                queueMicrotask(() => {
                     try {
                         const result = callback(value);
                         if (result instanceof MyPromise) {
@@ -48,21 +55,22 @@ class MyPromise {
                     } catch (error) {
                         reject(error);
                     }
-                }, 0);
+                    this.isHandled=true;
+                });
             };
     
             if (this.state === MyPromise.STATE.FULFILLED) {
-                handleCallback(this.value);
+                handleCallback(this.result);
             }
             else {
-                this.fulfilledCallbacks.push(handleCallback);
+                this.fulfillReactions.push(handleCallback);
             }
         });
     }
     catch(onRejected) {
         return new MyPromise((resolve, reject) => {
             const handleCallback = (value) => {
-                setTimeout(() => {
+                queueMicrotask(() => {
                     try {
                         const result = onRejected(value);
                         if (result instanceof MyPromise) {
@@ -73,39 +81,39 @@ class MyPromise {
                     } catch (error) {
                         reject(error);
                     }
-                }, 0);
+                });
             };
     
             if (this.state === MyPromise.STATE.REJECTED) {
-                handleCallback(this.error);
+                handleCallback(this.result);
             }
             else {
-                this.rejectedCallbacks.push(handleCallback);
+                this.rejectReactions.push(handleCallback);
             }
         });
     }
     finally(callback) {
         return new MyPromise((resolve, reject) => {
             const handleCallback = () => {
-                setTimeout(() => {
+                queueMicrotask(() => {
                     try {
                         callback();
                         if (this.state === MyPromise.STATE.FULFILLED) {
-                            resolve(this.value);
+                            resolve(this.result);
                         } else {
-                            reject(this.error);
+                            reject(this.result);
                         }
                     } catch (error) {
                         reject(error);
                     }
-                }, 0);
+                });
             };
     
             if (this.state !== MyPromise.STATE.PENDING) {
                 handleCallback();
             } else {
-                this.fulfilledCallbacks.push(handleCallback);
-                this.rejectedCallbacks.push(handleCallback); 
+                this.fulfillReactions.push(handleCallback);
+                this.rejectReactions.push(handleCallback); 
             }
         });
     }
