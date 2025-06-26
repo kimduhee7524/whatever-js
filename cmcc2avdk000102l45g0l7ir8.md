@@ -67,7 +67,7 @@ function Cat(name, age) {
 
 여기서 등장하는 개념이 바로 `this`입니다.  
 자바나 C++에선 `this`가 항상 "현재 인스턴스"를 가리키죠.  
-그런데 JS는 이렇게 되지 않습니다:
+하지만 JS는 this가 이렇게 고정적이지 않습니다.
 
 ```javascript
 function sayHi() {
