@@ -141,7 +141,7 @@ console.log(x); // ❌ ReferenceError
 let x = 5;
 ```
 
-* `x`는 호이스팅되어 메모리에 올라갔지만, **초기화 전(TDZ)**이기 때문에 접근하면 **ReferenceError 발생**
+* `x`는 메모리에 등록(호이스팅)되어 있지만, 초기화되기 전이라 TDZ 상태에 있으며, 이 시점에서 접근하면 `ReferenceError`가 발생합니다
     
 
 TDZ가 생긴 이유
@@ -186,13 +186,13 @@ let z = 40; // ❌ SyntaxError: Identifier 'z' has already been declared
 
 ---
 
-| 타입 | 호이스팅 여부 | 초기 값 | 선언 전 접근 |
-| --- | --- | --- | --- |
-| `var` 변수 | ✅ 선언 & 초기화 됨 | `undefined` | ✅ 가능 (undefined) |
-| `let` / `const` | ✅ 선언만 됨 (TDZ) | ❌ 초기화 X | ❌ ReferenceError |
-| 함수 선언 (`function`) | ✅ 선언 & 초기화 됨 | 함수 전체 | ✅ 가능 (정상 실행) |
-| 함수 표현식 (`var f = function()`) | ✅ 변수만 호이스팅 | `undefined` | ✅ 가능 (❌ TypeError) |
-| 함수 표현식 (`let` / `const`) | ✅ 선언만 됨 (TDZ) | ❌ 초기화 X | ❌ ReferenceEr |
+| 선언 방식 | 호이스팅 여부 | 초기 값 | 선언 전 접근 | 접근 시 오류 |
+| --- | --- | --- | --- | --- |
+| `var` 변수 | ✅ 선언 & 초기화 | `undefined` | ✅ 가능 | 없음 (`undefined`) |
+| `let` / `const` | ✅ 선언만 됨 (TDZ) | ❌ 초기화 X | ❌ 불가 | `ReferenceError` |
+| 함수 선언 (`function`) | ✅ 선언 & 초기화 | 함수 전체 | ✅ 가능 | 없음 |
+| 함수 표현식 (`var`) | ✅ 변수만 호이스팅 | `undefined` | ✅ 가능 | `TypeError` |
+| 함수 표현식 (`let` / `const`) |  |  |  |  |
 
 모든 변수와 함수 선언은 실행 컨텍스트 생성 시점에 **메모리에 등록(호이스팅)** 되지만,  
 **초기화 시점**과 **접근 가능 여부(TDZ 적용 여부)**는 선언 방식에 따라 달라집니다
