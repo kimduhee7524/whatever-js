@@ -286,12 +286,12 @@ export function useModal<T>(component: ModalComponent<T>) {
 
 ```typescript
 const openModal = <T,>(Component: ModalComponent<T>): Promise<T> => {
-  // Promise 반환
+  // 모달을 열 때마다 모달 닫기 함수를 포함한 Promise를 반환
   return new Promise<T>((resolve) => {
     const key = `modal-${keyCounter.current++}`;
     const close = (result: T) => {
-      resolve(result); // //  결과를 외부로 넘겨주는 코드
-      setModals((prev) => prev.filter((m) => m.key !== key)); // 모달 닫기
+      resolve(result);  // 모달 닫기 시 결과값 반환
+      setModals((prev) => prev.filter((m) => m.key !== key));
     };
     const element = <Component close={close} />;
     setModals((prev) => [...prev, { key, element }]);
@@ -307,7 +307,7 @@ const openModal = <T,>(Component: ModalComponent<T>): Promise<T> => {
 const { open } = useModal<UserFormValues>(UserFormModal);
 
 const handleClick = async () => {
-  const formValues = await open(); // 사용자 입력 기다림
+  const formValues = await open(); // 결과값(사용자 입력) 기다림
   if (!formValues) return;
 
   await api.createUser(formValues);
@@ -324,7 +324,7 @@ export function UserFormModal({ close }: { close: (value: UserFormValues | null)
   const [name, setName] = useState('');
   const handleSubmit = () => {
     if (!name) return;
-    close({ name }); // 값 반환하고 모달 닫기
+    close({ name }); 
   };
 
   return (
