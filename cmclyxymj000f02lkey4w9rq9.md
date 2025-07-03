@@ -1,5 +1,5 @@
 ---
-title: "React에서 모달 선언적으로 관리하는 방법"
+title: "React에서 비동기 제어 가능한 선언형 모달 시스템 구현하기"
 datePublished: Wed Jul 02 2025 13:04:39 GMT+0000 (Coordinated Universal Time)
 cuid: cmclyxymj000f02lkey4w9rq9
 slug: react
