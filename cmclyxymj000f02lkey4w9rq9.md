@@ -217,6 +217,145 @@ export default function UserFormModal({ onClose }: { onClose: () => void }) {
 
 ---
 
-## 마무리
+지금까지 선언형 모달을 만들어보았는데요.  
+지금 구조에서는 단순히 화면에 모달을 띄우고 닫는 역할만 가능합니다  
+하지만 현재 구조만으로는 큰 한계를 가지고 있습니다.
 
-React로 UI를 만들 때, 선언형 패턴은 유지보수성과 확장성 측면에서 큰 장점을 제공합니다. `useModal()` 같은 방식으로 모달을 관리하면 코드가 훨씬 더 깔끔하고 재사용 가능해진답니다.
+예를 들어 이름을 입력받는 모달에서 사용자가 값을 입력하고 "확인"을 눌렀을 때,  
+이 값을 받아서 API 요청을 하고 싶어도, 기존 구조에선 그 값을 받을 방법이 없습니다.  
+모달이 닫힐 뿐, 외부에서 결과를 알 수는 없습니다.
+
+```javascript
+const { showModal, hideModal } = useModal();
+
+const handleOpenModal = () => {
+  showModal(<MyModal onClose={hideModal} />);  //  여기선 값을 받을 수 없다!!!!
+  // 사용자가 뭘 입력했는지 알 수 없음
+};
+
+return <button onClick={handleOpenModal}>모달 열기</button>;
+```
+
+모달을 열고, 사용자가 입력을 완료하면 그 값을 받아서 후속 작업을 하고 싶은데...  
+지금 구조에선 그게 안 되네..?
+
+### 😣 기존 구조의 한계
+
+* 사용자 입력 결과를 외부로 전달받을 수 없음
+    
+* 그래서 `모달 결과를 받아서 처리하는 로직을 작성할 수 없음`
+    
+
+이 한계를 해결하기 위해, 모달을 보다 **비동기적으로 사용할 수 있는 구조**로 확장합니다.
+
+즉, `window.confirm()`처럼 **모달이 닫힐 때까지 기다렸다가**, **사용자 입력 값을 반환 받는 방식**입니다.
+
+### 우리가 원하는 구조
+
+```typescript
+const { open } = useModal(UserFormModal);
+const result = await open(); // 모달을 띄우고, 결과를 기다림
+
+if (result) {
+  await api.createUser(result);
+}
+```
+
+* `open()`을 호출하면 모달이 뜨고
+    
+* 사용자가 입력하면 `close(value)`를 호출
+    
+* 그럼 `await open()`이 깨어나서 값을 받아옴
+    
+
+### 어떻게 구현할까?
+
+그러기위해서는 **Promise를 반환하는 함수**를 제공해야 합니다.
+
+### 1\. `useModal.ts`
+
+```typescript
+export function useModal<T>(component: ModalComponent<T>) {
+  const { openModal } = useModalContext();  // 전역 모달 상태에 접근
+  const open = useCallback(() => openModal(component), [component]);
+  return { open };
+}
+```
+
+### 2\. `ModalContext.tsx`
+
+```typescript
+const openModal = <T,>(Component: ModalComponent<T>): Promise<T> => {
+  // Promise 반환
+  return new Promise<T>((resolve) => {
+    const key = `modal-${keyCounter.current++}`;
+    const close = (result: T) => {
+      resolve(result); // //  결과를 외부로 넘겨주는 코드
+      setModals((prev) => prev.filter((m) => m.key !== key)); // 모달 닫기
+    };
+    const element = <Component close={close} />;
+    setModals((prev) => [...prev, { key, element }]);
+  });
+};
+```
+
+---
+
+### 사용 예시
+
+```typescript
+const { open } = useModal<UserFormValues>(UserFormModal);
+
+const handleClick = async () => {
+  const formValues = await open(); // 사용자 입력 기다림
+  if (!formValues) return;
+
+  await api.createUser(formValues);
+  toast.success('등록 성공!');
+};
+```
+
+---
+
+### 모달 컴포넌트
+
+```typescript
+export function UserFormModal({ close }: { close: (value: UserFormValues | null) => void }) {
+  const [name, setName] = useState('');
+  const handleSubmit = () => {
+    if (!name) return;
+    close({ name }); // 값 반환하고 모달 닫기
+  };
+
+  return (
+    <div className="bg-white p-6 rounded">
+      <h2>이름 입력</h2>
+      <input value={name} onChange={(e) => setName(e.target.value)} />
+      <div className="mt-4 flex justify-end gap-2">
+        <button onClick={() => close(null)}>취소</button>
+        <button onClick={handleSubmit}>등록</button>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+### 모달 구조 흐름 요약
+
+```yaml
+[ useModal(UserFormModal).open() 호출 ]
+           ↓
+[ openModal() 내부에서 모달 JSX 생성 + 상태에 추가 ]
+           ↓
+[ ModalRoot가 자동 렌더링 → 모달 화면에 뜸 ]
+           ↓
+[ 사용자 입력 후 close(result) 호출 ]
+           ↓
+[ resolve(result) → open() Promise가 완료됨 ]
+           ↓
+[ 외부에서 result 값 받아서 후속 처리 ]
+```
+
+지금까지 선언형 모달을 비동기적으로 제어하는 구조에 대해 알아보았습니다.
