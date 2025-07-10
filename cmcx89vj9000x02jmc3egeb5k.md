@@ -6,9 +6,9 @@ slug: usesyncexternalstore
 
 ---
 
-useSyncExternalStore란?
+### useSyncExternalStore란?
 
-외부에 있는 상태가 바뀌었을 때, React 컴포넌트를 **자동으로 다시 렌더링**하게 도와주는 훅입니다. useSyncExternalStore는 React가 기존에 가진 구조적 한계를 해소하려는 **시도**라고 볼 수 있는데요. useSyncExternalStore가 왜 필요한지, 어떤 문제를 해결하는지 최대한 쉽고 자세하게 정리해보려고 합니다.
+외부에 있는 상태가 바뀌었을 때, React 컴포넌트를 **자동으로 다시 렌더링**하게 도와주는 훅입니다. 이는 React가 기존에 가지고 있던 구조적인 한계를 극복하기 위한 시도라고 볼 수 있는데요. 이번 글에서는 `useSyncExternalStore`가 왜 필요한지, 어떤 문제를 해결하는지에 대해 최대한 쉽고 자세하게 정리해보겠습니다.다.
 
 ## 기존 문제점
 
