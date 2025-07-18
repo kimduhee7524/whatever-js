@@ -132,7 +132,7 @@ function CounterDisplay() {
 
 ---
 
-### **4️⃣** overlay-kit
+### **4️⃣** overlay-kit: 구조적 분리 + 이벤트 시스템
 
 overlay-kit은 **명령과 상태의 분리**를 넘어서,  
 **React 컴포넌트 외부에서도 명령을 내릴 수 있도록 이벤트 시스템을 도입**합니다.
@@ -183,7 +183,7 @@ function OverlayProvider({ children }) {
     
 
 React 내부가 아닌, 외부에서도 명령을 보낼 수 있도록 `overlay-kit`은 **Emitter 기반 이벤트 시스템**을 사용합니다.  
-이 시스템은 크게 **"신호를 보내는 쪽"**과 **"신호를 듣는 쪽"**으로 나뉩니다.
+이 시스템은 크게 "신호를 보내는 쪽"과 "신호를 듣는 쪽"으로 나뉩니다.
 
 * **신호를 듣는 쪽 (OverlayProvider)**
     
@@ -216,7 +216,7 @@ function HomePage() {
 }
 ```
 
-사용자가 [overlay.open](http://overlay.open)을 호출하면, 내부적으로 **createEvent**를 통해 내부적으로 `emitter.emit('open', data)` 형식으로 이벤트를 발생시킵니다.
+사용자가 [overlay.open](http://overlay.open)을 호출하면, 내부적으로 emitter.emit('open', data) 형식으로 이벤트를 발생시킵니다.
 
 ```typescript
 // emitter.js
@@ -248,19 +248,7 @@ emitter는 "open" 신호를 받아서, **미리 등록되어 있던 OverlayPro
 
 ---
 
-### 정리
-
-* Context는 구독 기반 구조지만, **불필요한 구독은 리렌더링 문제를 유발**합니다.
-    
-* Context 두 개로 나누면 어느 정도 해결되지만, **명령은 여전히 React 내부에서만 가능**합니다.
-    
-* `overlay-kit`은 구조적 분리와 이벤트 시스템을 통해, **성능과 유연성 모두를 확보한 설계를 보여줍니다.**
-    
-
-> ⚙️ 리렌더링 성능 문제를 최소화하고, 유연한 설계를 원한다면  
-> **Context 사용 방식부터 구조를 다시 고민해보는 것**이 중요합니다.
-
-### +) overlay-kit 흐름 간단 정리
+### 5️⃣ overlay-kit의 오버레이 렌더링 흐름
 
 1. **앱 시작시 이벤트등록**
     
@@ -271,15 +259,39 @@ emitter는 "open" 신호를 받아서, **미리 등록되어 있던 OverlayPro
 <OverlayProvider/>
 ```
 
-OverlayProvider 컴포넌트가 처음 렌더링(마운트)됩니다.  
-이때, OverlayProvider 내부에 useOverlayEvent가 실행됩니다
+```javascript
+function OverlayProvider() {
+  const [overlayState, overlayDispatch] = useReducer(overlayReducer, {
+     current: null,
+     overlayOrderList: [],
+     overlayData: {},
+  });
+
+  // open 함수를 직접 만듦!
+  const open = useCallback(({ controller, overlayId, componentKey }) => {
+    // 오버레이 상태를 바꾸는 코드
+    overlayDispatch({ type: 'ADD', overlay: { ... } });
+  }, []);
+  
+   const close= useCallback((overlayId: string) => {
+    // 오버레이 상태를 바꾸는 코드
+    overlayDispatch({ type: 'REMOVE', overlayId });
+  }, []);
+
+  // 이 함수들을 useOverlayEvent에 전달!
+  // "이벤트가 오면, dispatch 함수를 실행해서 상태를 변경해줘" 라고 등록
+  useOverlayEvent({ open, close, ... });
+}
+```
+
+앱 시작 시 OverlayProvider 컴포넌트가 처음 렌더링됩니다.  
+이때, OverlayProvider 내부에서는 open, close 등 이벤트에 대한 핸들러(=dispatch 함수)를 emitter에 등록합니다. 이때 등록되는 함수들은 오버레이 상태를 변경하는 함수입니다.
 
 ```typescript
 useOverlayEvent({ open, close, unmount, closeAll, unmountAll });
 ```
 
-이 코드는 내부적으로 emitter.on을 호출해서, open, close 등 각각의 이벤트가 오면 각 이벤트에 따라 어떤 **새로운 오버레이(모달) 정보를 overlayState에 추가할**지를 **미리 등록(약속)**해둡니다.
-
+이 코드는 내부적으로 emitter.on을 호출해서, open, close 등 각각의 이벤트가 오면 각 이벤트에 따라 어떤 **새로운 오버레이(모달) 정보를 overlayState에 추가할**지를 미리 등록(약속)해둡니다.  
 **이 시점부터, emitter는 "open" 이벤트가 오면** OverlayProvider의 open 함수를 실행해야 한다는 것을 "알고 있습니다".
 
 ---
@@ -288,16 +300,171 @@ useOverlayEvent({ open, close, unmount, closeAll, unmountAll });
     
 
 ```typescript
-const modalId = overlay.open(MyModalComponent);
+function MyModal({ isOpen, close, overlayId, unmount }) {
+  return (
+    isOpen && (
+      <div>
+        <h1>모달입니다!</h1>
+        <button onClick={close}>닫기</button>
+      </div>
+    )
+  );
+}
+
+// 오버레이 열기!
+overlay.open(MyModal);
 ```
 
-**사용자가** [**overlay.open**](http://overlay.open)**()을 호출하면** 내부적으로 `createEvent('open')`을 통해 **이벤트를 발생시켜** `emitter.emit`을 호출합니다:
+```javascript
+// open 함수는 이렇게 동작
+const open = (controller) => {
+  // controller = MyModal
+  const overlayId = randomId();
+  const componentKey = randomId();
+  const dispatchOpenEvent = createEvent('open');
+  // 오버레이를 띄워달라는 이벤트를 보냄
+  dispatchOpenEvent({ controller, overlayId, componentKey });
+};
+```
+
+사용자가 [overlay.open](http://overlay.open)을 호출하면, 내부적으로 dispatchOpenEvent 를 통해 `emitter.emit('open', { ... })`가 실행됩니다.
 
 ---
 
 3. **연결: emitter가 약속을 실행**
     
 
-emitter.emit()이 호출되면 emitter는 "이 이벤트를 듣고 있던(등록했던) 함수"를 찾습니다.즉, **OverlayProvider의 open 함수를 찾아서 실행**합니다.  
- open 함수는 overlayDispatch를 호출해서 상태를 변경합니다.  
-OverlayProvider의 상태가 바뀜에 따라 오버레이 컴포넌트가 리렌더링됩니다.
+```javascript
+// emitter.js
+const listeners = new Map();
+
+export const emitter = {
+  on(eventName, callback) {
+    if (!listeners.has(eventName)) {
+      listeners.set(eventName, []);
+    }
+    listeners.get(eventName).push(callback);
+  },
+
+  emit(eventName, data) {
+    const eventListeners = listeners.get(eventName);
+    if (eventListeners) {
+      eventListeners.forEach((cb) => cb(data));
+    }
+  },
+};
+```
+
+emitter는 'open' 이벤트가 발생하면, 등록했던 OverlayProvider의 open 함수를 실행합니다.  
+이 함수는 overlayDispatch로 상태를 변경합니다.
+
+4\. 실제 오버레이 렌더링
+
+```typescript
+<OverlayContextProvider value={overlayState}>
+	{overlayState.overlayOrderList.map((item) => {
+   const { id: currentOverlayId, componentKey, isOpen, controller: Controller } = overlayState.overlayData[item];
+	
+	return (
+		// 오버레이를 실제로 렌더링할 때
+		<ContentOverlayController
+		  isOpen={isOpen}
+		  overlayId={overlayId}
+		  controller={controller} // = MyModal
+		  overlayDispatch={...}
+		/>
+		})}
+</OverlayContextProvider>
+```
+
+상태가 변경되면, OverlayProvider가 context로 내려주는 overlayState가 바뀌고,  
+overlayOrderList를 순회하며, 각 오버레이에 대해 ContentOverlayController를 렌더링합니다.
+
+```typescript
+// controller(MyModal)를 실제로 화면에 렌더링할 때
+<Controller
+  isOpen={isOpen}
+  overlayId={overlayId}
+  close={() => overlayDispatch({ type: 'CLOSE', overlayId })}
+  unmount={() => overlayDispatch({ type: 'REMOVE', overlayId })}
+/>
+```
+
+open 함수에 넘긴 함수(컴포넌트)는, 실제로 화면에 렌더링될 때,  
+ContentOverlayController가 **props(overlayProps)**를 만들어서 넣어줍니다.  
+이때, isOpen, overlayId, close, unmount 등의 props가 전달됩니다.
+
+```typescript
+<MyModal
+  isOpen={true}
+  overlayId="랜덤ID"
+  close={함수}
+  unmount={함수}
+/>
+```
+
+결국 MyModal이 이렇게 호출됨:
+
+### 6️⃣ openAsync의 동작
+
+```typescript
+const open = (controller: OverlayControllerComponent, options?: OpenOverlayOptions) => {
+  const overlayId = options?.overlayId ?? randomId();
+  const componentKey = randomId();
+  const dispatchOpenEvent = createEvent('open');
+
+  dispatchOpenEvent({ controller, overlayId, componentKey });
+  return overlayId;
+};
+
+const openAsync = async <T>(controller: OverlayAsyncControllerComponent<T>, options?: OpenOverlayOptions) => {
+  return new Promise<T>((resolve) => {
+    open((overlayProps) => {
+      const close = (param: T) => {
+        resolve(param);
+        overlayProps.close();
+      };
+
+      const props = { ...overlayProps, close };
+      return controller(props);
+    }, options);
+  });
+};
+```
+
+참고로 openAsync 안에 open함수에서 `(overlayProps) => { ... }` 이 화살표 함수가 open 함수의 props에서 controller 컴포넌트를 뜻합니다. 즉 **open에 넘기는 함수는 "컴포넌트"다.**
+
+```tsx
+open((overlayProps) => { ... }, options);
+
+open(controller, options?) 
+```
+
+아무튼 openAsync는 "오버레이가 닫힐 때, 닫힐 때의 값을 Promise로 돌려주고 싶다”가 핵심입니다.원래 overlayProps.close는 "오버레이를 닫는 함수"입니다.  
+하지만 openAsync에서는 "오버레이를 닫으면서, 동시에 Promise도 resolve(완료)하고 싶다!"이런 특별한 동작이 필요합니다. **그래서 close를 덮어씌워** 아래처럼 **새로운 close 함수를 만듭니다**
+
+```typescript
+const close = (param: T) => {
+  resolve(param);           // 1. Promise를 완료시킴
+  overlayProps.close();     // 2. 실제로 오버레이를 닫음
+};
+```
+
+그리고 이 close를 기존 overlayProps.close 대신 **props로 넘깁니다**:  
+오버레이 내부(MyModal 등)에서 props.close(param)을 호출하면,
+
+1. Promise가 resolve됨 (openAsync의 결과값이 됨)
+    
+2. 오버레이가 닫힘
+    
+
+즉, **openAsync로 띄운 오버레이는** 닫힐 때 값을 외부로 전달할 수 있다!  
+`resolve`의 파라미터는 **Promise가 성공했을 때 반환하고 싶은 값**입니다. 이 값은 `.then()` 또는 `await`에서 받아서 사용할 수 있어요.
+
+### 정리
+
+* Context는 구독 기반 구조지만, **불필요한 구독은 리렌더링 문제를 유발**합니다.
+    
+* Context 두 개로 나누면 어느 정도 해결되지만, **명령은 여전히 React 내부에서만 가능**합니다.
+    
+* `overlay-kit`은 구조적 분리와 이벤트 시스템을 통해, **성능과 유연성 모두를 확보한 설계를 보여줍니다.**
